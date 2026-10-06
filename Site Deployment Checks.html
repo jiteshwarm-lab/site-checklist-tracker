@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Site Deployment Checks</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#f3f5f7;--panel:#fff;--ink:#1c2530;--mute:#6b7785;--line:#dde2e8;--acc:#1f4e8c;--accsoft:#e3ecf7;--pre:#b45309;--post:#0f766e;--ok:#2e7d32;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171d;--panel:#1b222b;--ink:#e6ebf1;--mute:#93a0af;--line:#2c3541;--acc:#7fb0ee;--accsoft:#22344b;--pre:#f0a95a;--post:#4fc3b5;--ok:#7bc47f}}
+:root[data-theme="dark"]{--bg:#12171d;--panel:#1b222b;--ink:#e6ebf1;--mute:#93a0af;--line:#2c3541;--acc:#7fb0ee;--accsoft:#22344b;--pre:#f0a95a;--post:#4fc3b5;--ok:#7bc47f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+header{padding:18px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{margin:0;font-size:20px;font-weight:600}
+header p{margin:2px 0 0;color:var(--mute);font-size:13px}
+main{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 78px)}
+aside{border-right:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
+aside input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;margin-bottom:10px}
+.site{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:10px;border:0;background:none;color:inherit;font:inherit;border-radius:6px;cursor:pointer}
+.site:hover{background:var(--bg)}
+.site.on{background:var(--accsoft);font-weight:600;border-left:3px solid #8fb9e3}
+.pct{font-size:12px;color:var(--mute)}
+.pctpill{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.pctpill.p0{background:#EDEDF1;color:#6b7785}
+.pctpill.pmid{background:#FFF3D6;color:#7a5b06}
+.pctpill.pfull{background:#DCEFE1;color:#1e6b3a}
+section{padding:24px;max-width:860px}
+.crumb{color:var(--mute);font-size:13px;margin-bottom:14px}
+h2{margin:0 0 4px;font-size:22px}
+.types{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 22px}
+.types button{padding:9px 16px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:20px;font:inherit;cursor:pointer}
+.types button[data-t="GreyMatter"]{background:#E6F0FB;border-color:#BBD6F2;color:#1d4e82}
+.types button[data-t="JSON"]{background:#FFF3D6;border-color:#F3DE9E;color:#7a5b06}
+.types button[data-t="Infra"]{background:#EDEDF1;border-color:#D4D4DC;color:#3f3f4a}
+.types button[data-t="GreyMatter"].on{background:#BBD6F2;border-color:#8fb9e3;color:#163a5c}
+.types button[data-t="JSON"].on{background:#F3DE9E;border-color:#e0c468;color:#5c4404}
+.types button[data-t="Infra"].on{background:#D4D4DC;border-color:#b5b5c0;color:#2a2a32}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.card h3{margin:0 0 4px;font-size:16px}
+.pre h3{color:var(--pre)}.post h3{color:var(--post)}
+.bar{height:5px;background:var(--line);border-radius:3px;margin:8px 0 12px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .2s}
+label{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line);cursor:pointer}
+label:first-of-type{border-top:0}
+input[type=checkbox]{margin-top:4px;accent-color:var(--ok);width:16px;height:16px;flex:none}
+label.done .tx{color:var(--mute);text-decoration:line-through}
+.empty{color:var(--mute);padding:40px 0}
+.actions{margin-top:16px}
+.actions button{padding:7px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;font:inherit;cursor:pointer}
+.ticketbar{display:flex;align-items:center;gap:10px;margin:0 0 16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 14px;max-width:280px}
+.ticketbar label{border:0;padding:0;display:flex;align-items:center;gap:8px}
+.ticketbar input{width:140px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.addcard{margin-top:16px}
+.addcard h3{margin:0 0 4px;font-size:16px}
+.form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.form select,.form input{padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.form input{flex:1;min-width:180px}
+.form button{padding:8px 14px;border:1px solid var(--acc);background:var(--acc);color:#fff;border-radius:6px;font:inherit;cursor:pointer}
+.tag{font-size:11px;font-style:normal;color:var(--acc);border:1px solid var(--acc);border-radius:10px;padding:0 6px;margin-left:6px}
+label{align-items:flex-start}
+label .tx{flex:1}
+.xmark{background:none;border:0;color:#c62828;font-size:16px;line-height:1;padding:2px 6px;cursor:pointer;flex:none}
+.xmark:hover{color:#8e1c1c}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+footer.ver{padding:8px 24px;font-size:12px;color:var(--mute)}
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal{background:var(--panel);border-radius:10px;padding:24px;max-width:360px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.modal h3{margin:0 0 8px;font-size:17px}
+.modal p{margin:0 0 18px;color:var(--mute);font-size:14px}
+.modal button{padding:8px 18px;border:1px solid var(--acc);background:var(--acc);color:#fff;border-radius:6px;font:inherit;cursor:pointer}
+@media(max-width:760px){main{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line);max-height:230px}.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>Site Deployment Checks</h1><p>Pick a site, choose GreyMatter, JSON or Infra, then work through the pre and post checks for that site.</p></header>
+<main>
+<aside><input id="q" placeholder="Search site name" aria-label="Search site name"><div id="list"></div></aside>
+<section id="view"></section>
+</main>
+<footer id="ver" class="ver">Build 10 (header + card colors reverted, type tags + sidebar pills kept)</footer>
+<div id="modal"></div>
+<script>
+var SITES=["Walmart Mexico","H&M Canada","Sam's ATL"];
+var TYPES=["GreyMatter","JSON","Infra"];
+var CHECKS={
+"Walmart Mexico":{
+ GreyMatter:{pre:["Confirm current version 7.4.0.49-HF8 and target GM version","Backup GM config and DB (Walmart Mexico RTP-TTP)","Get sign-off from CS POC Gaurav Agrawal","Confirm no VDA update running in the same week"],
+  post:["GM services healthy on RTP and TTP","Verify version reads target on both setups","Orders flowing end to end on Mexico stores","Watch error logs for 30 min"]},
+ JSON:{pre:["Validate Tag JSON and map JSON against schema","Diff new JSON against live Mexico copy","Backup current JSON files","Peer review of tag and map changes"],
+  post:["JSON loads with no parse errors","Tag and map changes visible in the UI","Run a sample task using updated map","Store rollback copy of previous JSON"]},
+ Infra:{pre:["Snapshot RTP and TTP VMs","Check CPU, memory and disk headroom","Confirm gate controller network access","Notify Mexico site stakeholders of window"],
+  post:["All hosts reachable after update","Gate controllers reconnected","Monitoring and alerts active","Latency and resource usage normal"]}},
+"H&M Canada":{
+ GreyMatter:{pre:["Confirm current version 7.1.0.34-HF7 and target GM version","Backup GM config and DB (H&M Canada RTP-TTP)","Get sign-off from CS POC Branden Serrar","Confirm OS patching is not scheduled in the same window"],
+  post:["GM services healthy on RTP and TTP","Verify version reads target","Confirm pick and put flows work","Watch error logs for 30 min"]},
+ JSON:{pre:["Validate JSON against schema","Diff new JSON against live H&M copy","Backup current JSON files","Confirm change list with Branden Serrar"],
+  post:["JSON loads with no parse errors","Changes visible in the UI","Run a sample task on the updated config","Store rollback copy of previous JSON"]},
+ Infra:{pre:["Snapshot RTP and TTP VMs","Check OS patch level and pending reboots","Verify firewall and VPN access for Canada site","Confirm rollback plan and window"],
+  post:["All hosts back after OS patching","Services restarted cleanly","Monitoring and alerts active","Disk and memory usage normal"]}},
+"Sam's ATL":{
+ GreyMatter:{pre:["Confirm current version 7.1.0.28-HF7 and target GM version","Backup GM config and DB (Sam's ATL RTP-TTP)","Get sign-off from CS POC Vivian Soler","Confirm VDA v1.8.0 status before starting"],
+  post:["GM services healthy on RTP and TTP","Verify version reads target","Confirm club order flow end to end","Watch error logs for 30 min"]},
+ JSON:{pre:["Validate JSON against schema","Diff new JSON against live ATL copy","Backup current JSON files","Review WCS and map changes with Vivian Soler"],
+  post:["JSON loads with no parse errors","Map update and resource changes visible","Run a sample task on the updated config","Store rollback copy of previous JSON"]},
+ Infra:{pre:["Snapshot RTP and TTP VMs","Check resources ahead of the upgrade","Verify Shuttle and network connectivity","Confirm rollback plan and window"],
+  post:["All hosts reachable","Infra and Shuttle services running","Monitoring and alerts active","Resource usage normal after upgrade"]}}
+};
+var state={site:null,type:null,done:{}};
+try{state.done=JSON.parse(localStorage.getItem("siteChecks")||"{}")}catch(e){}
+function save(){try{localStorage.setItem("siteChecks",JSON.stringify(state.done))}catch(e){}}
+function key(s,t,p,i){return [s,t,p,i].join("|")}
+function progress(s){var n=0,d=0;TYPES.forEach(function(t){["pre","post"].forEach(function(p){items(s,t,p).forEach(function(it){n++;if(state.done[it.k])d++})})});return Math.round(100*d/n)}
+function esc(x){return String(x).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function showModal(msg){document.getElementById("modal").innerHTML='<div class="modal-wrap" id="modalwrap"><div class="modal"><h3>Cannot reset yet</h3><p>'+esc(msg)+'</p><button id="modalok">OK</button></div></div>'}
+function closeModal(){document.getElementById("modal").innerHTML=""}
+function renderList(){
+ var q=document.getElementById("q").value.toLowerCase(),h="";
+ SITES.filter(function(s){return s.toLowerCase().indexOf(q)>-1}).forEach(function(s){
+  var pv=progress(s),pc=pv===0?'p0':(pv===100?'pfull':'pmid');
+  h+='<button class="site'+(s===state.site?' on':'')+'" data-s="'+esc(s)+'"><span>'+esc(s)+'</span><span class="pctpill '+pc+'">'+pv+'%</span></button>'});
+ document.getElementById("list").innerHTML=h||'<p class="empty">No sites match.</p>';
+}
+var EXTRA={};
+try{EXTRA=JSON.parse(localStorage.getItem("siteChecksExtra")||"{}")}catch(e){}
+function saveExtra(){try{localStorage.setItem("siteChecksExtra",JSON.stringify(EXTRA))}catch(e){}}
+var TICKETS={};
+try{TICKETS=JSON.parse(localStorage.getItem("siteChecksTicket")||"{}")}catch(e){}
+function saveTickets(){try{localStorage.setItem("siteChecksTicket",JSON.stringify(TICKETS))}catch(e){}}
+function ticketBar(){
+ var tk=TICKETS[extraKey(state.site,state.type)]||"";
+ return '<div class="ticketbar"><label>CRN number <input id="ticketnum" value="'+esc(tk)+'"></label></div>';
+}
+function extraKey(s,t){return s+"|"+t}
+function extras(s,t,p){return (EXTRA[extraKey(s,t)]||[]).filter(function(x){return x.phase===p})}
+function items(s,t,p){
+ var out=CHECKS[s][t][p].map(function(x,i){return{t:x,k:key(s,t,p,i)}});
+ extras(s,t,p).forEach(function(x){out.push({t:x.text,k:"x"+x.id,extra:1,ref:x.ref,id:x.id})});
+ return out;
+}
+function block(p,title,sub){
+ var arr=items(state.site,state.type,p),d=0,h="";
+ arr.forEach(function(it){var c=!!state.done[it.k];if(c)d++;
+  h+='<label class="'+(c?'done':'')+'"><input type="checkbox" data-k="'+esc(it.k)+'"'+(c?' checked':'')+'><span class="tx">'+esc(it.t)+'</span>'+(it.extra?'<button type="button" class="xmark" title="Remove this check" data-rm="'+esc(it.id)+'">✕</button>':'')+'</label>'});
+ return '<div class="card '+p+'"><h3>'+title+'</h3><div class="pct">'+sub+' · '+d+' of '+arr.length+' done</div><div class="bar"><i style="width:'+(100*d/arr.length)+'%"></i></div>'+h+'</div>';
+}
+function addForm(){
+ return '<div class="card addcard"><h3>Add check</h3><div class="pct">Adds straight to the list for '+esc(state.site)+' · '+state.type+'. (No approval step yet — that comes next.)</div>'+
+  '<div class="form"><select id="aphase"><option value="pre">Pre-check</option><option value="post">Post-check</option></select>'+
+  '<input id="aref" placeholder="Ticket ID (optional)" maxlength="40">'+
+  '<input id="atext" placeholder="Describe the check" maxlength="200">'+
+  '<button id="asend">Add check</button></div></div>';
+}
+function renderView(){
+ var v=document.getElementById("view");
+ if(!state.site){v.innerHTML='<p class="empty">Select a site from the list to begin.</p>';return}
+ var h='<div class="crumb">'+esc(state.site)+(state.type?' › '+state.type:'')+'</div><h2>'+esc(state.site)+'</h2><div class="pct">Choose a deployment type</div><div class="types">';
+ TYPES.forEach(function(t){h+='<button data-t="'+t+'" class="'+(t===state.type?'on':'')+'">'+t+'</button>'});
+ h+='</div>';
+ if(!state.type){h+='<p class="empty">Select a deployment type to see its checks.</p>'}
+ else{h+=ticketBar()+'<div class="cols">'+block("pre","Pre-checks","Before deployment")+block("post","Post-checks","After deployment")+'</div><div class="actions"><button id="reset">Reset these checks</button></div>'+addForm()}
+ v.innerHTML=h;
+}
+document.addEventListener("click",function(e){
+ var s=e.target.closest("[data-s]"),t=e.target.closest("[data-t]");
+ if(s){state.site=s.dataset.s;state.type=null;renderList();renderView()}
+ else if(t){state.type=t.dataset.t;renderView()}
+ else if(e.target.id==="reset"){
+  var crn=(TICKETS[extraKey(state.site,state.type)]||"").trim();
+  if(!crn){showModal("CRN number is not filled.");return}
+  var allDone=["pre","post"].every(function(p){return items(state.site,state.type,p).every(function(it){return !!state.done[it.k]})});
+  if(!allDone){showModal("All checks are not complete.");return}
+  ["pre","post"].forEach(function(p){items(state.site,state.type,p).forEach(function(it){delete state.done[it.k]})});save();
+  delete TICKETS[extraKey(state.site,state.type)];saveTickets();
+  renderList();renderView();
+ }
+ else if(e.target.id==="modalok"){closeModal()}
+ else if(e.target.id==="modalwrap"){closeModal()}
+ else if(e.target.id==="asend"){
+  var txt=document.getElementById("atext").value.trim();if(!txt)return;
+  var phase=document.getElementById("aphase").value,ref=document.getElementById("aref").value.trim();
+  var ek=extraKey(state.site,state.type);
+  EXTRA[ek]=EXTRA[ek]||[];
+  EXTRA[ek].push({id:"e"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),phase:phase,ref:ref,text:txt});
+  saveExtra();
+  document.getElementById("atext").value="";document.getElementById("aref").value="";
+  renderList();renderView();
+ }
+ else if(e.target.dataset&&e.target.dataset.rm){
+  var ek2=extraKey(state.site,state.type),rmid=e.target.dataset.rm;
+  EXTRA[ek2]=(EXTRA[ek2]||[]).filter(function(x){return x.id!==rmid});
+  saveExtra();renderList();renderView();
+ }
+});
+document.addEventListener("change",function(e){
+ var k=e.target.dataset&&e.target.dataset.k;if(k){if(e.target.checked)state.done[k]=1;else delete state.done[k];save();renderList();renderView();return}
+});
+document.addEventListener("input",function(e){
+ if(e.target.id==="ticketnum"){TICKETS[extraKey(state.site,state.type)]=e.target.value;saveTickets();renderList()}
+});
+document.getElementById("q").addEventListener("input",renderList);
+renderList();renderView();
+</script>
+</body>
+</html>
