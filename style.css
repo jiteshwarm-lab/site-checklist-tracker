@@ -1,7 +1,7 @@
 
 :root {
-  --bg: #f3f5f7;
-  --panel: #ffffff;
+  --bg: #FFFDF2;
+  --panel: #FFFFFF;
   --ink: #1c2530;
   --mute: #6b7785;
   --line: #dde2e8;
@@ -409,7 +409,8 @@ label.done .tx {
 
 .empty {
   color: var(--mute);
-  padding: 40px 0;
+  padding: 20px 0;
+  font-weight: 700;
 }
 
 /* General action buttons */
@@ -477,7 +478,7 @@ label.done .tx {
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--bg);
+  background: var(--panel);
   color: var(--ink);
   font: inherit;
 }
@@ -667,4 +668,52 @@ header {
 
 #searchSite:focus {
   border-color: var(--acc);
+}
+
+/* JSON sub-types */
+.subtypes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 20px;
+}
+
+.sublabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mute);
+  margin-right: 4px;
+}
+
+.subtypes button {
+  padding: 6px 14px;
+  border: 1px solid #f3de9e;
+  background: #fff8e4;
+  color: #7a5b06;
+  border-radius: 16px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.subtypes button.on {
+  background: #f3de9e;
+  border-color: #e0c468;
+  color: #5c4404;
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* Combined checklist sections */
+.secthead {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mute);
+  letter-spacing: 0.3px;
+}
+
+.card > .secthead + label {
+  border-top: 0;
 }

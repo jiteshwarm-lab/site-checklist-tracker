@@ -185,9 +185,27 @@ var CHECKS = {
   }
 };
 
+var SUBTYPES = {
+  JSON: {
+    Map: {
+      pre: ["Confirm map version and the change list", "Check map for overlapping or missing coordinates"],
+      post: ["Verify the map loads and renders in the UI", "Run a test task across the changed map area"]
+    },
+    PPS: {
+      pre: ["Confirm PPS IDs and station mapping in the JSON", "Check no tasks are active at the affected PPS"],
+      post: ["Verify PPS stations are visible and reachable", "Run a sample pick/put at an affected PPS"]
+    },
+    Zigbee: {
+      pre: ["Confirm Zigbee device IDs and channel settings", "Check the network is stable before the change"],
+      post: ["Verify Zigbee devices reconnect", "Check no devices show offline after the update"]
+    }
+  }
+};
+
 var state = {
   site: null,
-  type: null,
+  types: {},
+  subs: {},
   done: {}
 };
 
@@ -199,23 +217,6 @@ function save() {
   try {
     localStorage.setItem("siteChecks", JSON.stringify(state.done));
   } catch (e) {}
-}
-
-function key(s, t, p, i) {
-  return [s, t, p, i].join("|");
-}
-
-function progress(s) {
-  var n = 0, d = 0;
-  TYPES.forEach(function(t) {
-    ["pre", "post"].forEach(function(p) {
-      items(s, t, p).forEach(function(it) {
-        n++;
-        if (state.done[it.k]) d++;
-      });
-    });
-  });
-  return n ? Math.round(100 * d / n) : 0;
 }
 
 function esc(x) {
@@ -252,10 +253,10 @@ function updateScreenVisibility() {
 function renderList() {
   updateScreenVisibility();
 
- var list = document.getElementById("list");
- var searchInput = document.getElementById("searchSite");
- var searchText = searchInput ? searchInput.value.trim().toLowerCase() : "";
-list.innerHTML = SITES
+  var list = document.getElementById("list");
+  var searchInput = document.getElementById("searchSite");
+  var searchText = searchInput ? searchInput.value.trim().toLowerCase() : "";
+  list.innerHTML = SITES
     .filter(function(site) {
       return site.toLowerCase().includes(searchText);
     })
@@ -296,10 +297,47 @@ function extraKey(s, t) {
   return s + "|" + t;
 }
 
-function ticketBar() {
-  var tk = TICKETS[extraKey(state.site, state.type)] || "";
-  return '<div class="ticketbar"><label>CRN number <input id="ticketnum" value="' +
-    esc(tk) + '"></label></div>';
+/* ---- Selection: any mix of deployment types / sub-types ---- */
+
+function subsOf(t) {
+  return SUBTYPES[t] ? Object.keys(SUBTYPES[t]) : [];
+}
+
+function resetSelection() {
+  state.types = {};
+  state.subs = {};
+}
+
+/* A "part" is one selected checklist: GreyMatter, Infra, or a sub-type such as JSON:Map */
+function selectedParts() {
+  var out = [];
+  TYPES.forEach(function(t) {
+    if (!state.types[t]) return;
+    var subs = subsOf(t);
+    if (!subs.length) {
+      out.push({id: t, label: t, t: t, sub: null});
+    } else {
+      subs.forEach(function(n) {
+        if (state.subs[t + ":" + n]) {
+          out.push({id: t + ":" + n, label: t + " \u00b7 " + n, t: t, sub: n});
+        }
+      });
+    }
+  });
+  return out;
+}
+
+/* Ticks and the CRN belong to the combination that is currently selected */
+function comboKey() {
+  return selectedParts().map(function(p) { return p.id; }).join("+");
+}
+
+function norm(t) {
+  return String(t).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function tickKey(p, n) {
+  return ["c", state.site, comboKey(), p, n].join("|");
 }
 
 function extras(s, t, p) {
@@ -308,57 +346,110 @@ function extras(s, t, p) {
   });
 }
 
-function items(s, t, p) {
-  var out = CHECKS[s][t][p].map(function(x, i) {
-    return {t: x, k: key(s, t, p, i)};
+function baseTexts(part, p) {
+  var list = CHECKS[state.site][part.t][p].slice();
+  if (part.sub) {
+    list = list.concat(SUBTYPES[part.t][part.sub][p] || []);
+  }
+  return list;
+}
+
+/* Combined list for one phase. Checks with the same wording across parts are merged
+   into "Common checks"; everything else sits under its own part. */
+function sections(p) {
+  var parts = selectedParts();
+  var groups = {}, order = [];
+
+  parts.forEach(function(part) {
+    baseTexts(part, p).forEach(function(text) {
+      var n = norm(text);
+      if (!groups[n]) {
+        groups[n] = {text: text, parts: []};
+        order.push(n);
+      }
+      if (groups[n].parts.indexOf(part.id) === -1) groups[n].parts.push(part.id);
+    });
   });
 
-  extras(s, t, p).forEach(function(x) {
-    out.push({
-      t: x.text,
-      k: "x" + x.id,
-      extra: 1,
-      ref: x.ref,
-      id: x.id
+  function row(n) {
+    return {text: groups[n].text, k: tickKey(p, n)};
+  }
+
+  var out = [];
+  var common = order.filter(function(n) { return groups[n].parts.length > 1; });
+  if (common.length) out.push({title: "Common checks", rows: common.map(row)});
+
+  parts.forEach(function(part) {
+    var rows = order
+      .filter(function(n) { return groups[n].parts.length === 1 && groups[n].parts[0] === part.id; })
+      .map(row);
+
+    extras(state.site, part.id, p).forEach(function(x) {
+      rows.push({text: x.text, k: "x" + x.id, extra: 1, id: x.id, part: part.id});
     });
+
+    if (rows.length) {
+      out.push({title: parts.length > 1 ? part.label : "", rows: rows});
+    }
   });
 
   return out;
 }
 
+function ticketBar() {
+  var tk = TICKETS[extraKey(state.site, comboKey())] || "";
+  return '<div class="ticketbar"><label>CRN number <input id="ticketnum" value="' +
+    esc(tk) + '"></label></div>';
+}
+
 function block(p, title, sub) {
-  var arr = items(state.site, state.type, p), d = 0, h = "";
+  var parts = selectedParts();
+  var d = 0, total = 0, h = "";
 
-  arr.forEach(function(it) {
-    var c = !!state.done[it.k];
-    if (c) d++;
+  sections(p).forEach(function(sec) {
+    if (sec.title) h += '<div class="secthead">' + esc(sec.title) + '</div>';
 
-    h += '<label class="' + (c ? "done" : "") + '">' +
-      '<input type="checkbox" data-k="' + esc(it.k) + '"' +
-      (c ? " checked" : "") + '>' +
-      '<span class="tx">' + esc(it.t) + '</span>' +
-      (it.extra
-        ? '<button type="button" class="xmark" title="Remove this check" data-rm="' +
-          esc(it.id) + '">✕</button>'
-        : "") +
-      '</label>';
+    sec.rows.forEach(function(it) {
+      total++;
+      var c = !!state.done[it.k];
+      if (c) d++;
+
+      h += '<label class="' + (c ? "done" : "") + '">' +
+        '<input type="checkbox" data-k="' + esc(it.k) + '"' +
+        (c ? " checked" : "") + '>' +
+        '<span class="tx">' + esc(it.text) + '</span>' +
+        (it.extra
+          ? '<button type="button" class="xmark" title="Remove this check" data-rm="' +
+            esc(it.id) + '" data-part="' + esc(it.part) + '">\u2715</button>'
+          : "") +
+        '</label>';
+    });
   });
 
-  var pct = arr.length ? (100 * d / arr.length) : 0;
+  var pct = total ? (100 * d / total) : 0;
+  var suffix = parts.length === 1 && parts[0].sub ? " (" + esc(parts[0].sub) + ")" : "";
 
   return '<div class="card ' + p + '">' +
-    '<h3>' + title + '</h3>' +
-    '<div class="pct">' + sub + ' · ' + d + ' of ' + arr.length + ' done</div>' +
+    '<h3>' + title + suffix + '</h3>' +
+    '<div class="pct">' + sub + ' \u00b7 ' + d + ' of ' + total + ' done</div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
     h + '</div>';
 }
 
 function addForm() {
+  var parts = selectedParts();
+  var partSelect = parts.length > 1
+    ? '<select id="apart">' + parts.map(function(p) {
+        return '<option value="' + esc(p.id) + '">' + esc(p.label) + '</option>';
+      }).join("") + '</select>'
+    : "";
+
   return '<div class="card addcard">' +
     '<h3>Add check</h3>' +
     '<div class="form"><select id="aphase">' +
     '<option value="pre">Pre-check</option>' +
     '<option value="post">Post-check</option></select>' +
+    partSelect +
     '<input id="aref" placeholder="Ticket ID (optional)" maxlength="200">' +
     '<input id="atext" placeholder="Describe the check" maxlength="200">' +
     '<button id="asend">Add check</button></div></div>';
@@ -374,25 +465,37 @@ function renderView() {
     return;
   }
 
-  if (!state.type || !CHECKS[state.site][state.type]) {
-    state.type = TYPES[0];
-  }
-
   var typesHTML = TYPES.map(function(type) {
+    var on = !!state.types[type];
     return `
       <button type="button"
-        class="${type === state.type ? "on" : ""}"
+        class="${on ? "on" : ""}"
+        aria-pressed="${on}"
         data-t="${esc(type)}">
         ${esc(type)}
       </button>
     `;
   }).join("");
 
-  view.innerHTML = `
-    <div class="crumb">${esc(state.site)} / Deployment Tracker</div>
-    <h2>${esc(state.site)}</h2>
-    <div class="types">${typesHTML}</div>
+  var subsHTML = TYPES.map(function(type) {
+    var list = subsOf(type);
+    if (!state.types[type] || !list.length) return "";
+    return '<div class="subtypes"><span class="sublabel">' + esc(type) + ' types</span>' +
+      list.map(function(n) {
+        var on = !!state.subs[type + ":" + n];
+        return '<button type="button" class="' + (on ? "on" : "") +
+          '" aria-pressed="' + on + '" data-sub="' + esc(type + ":" + n) + '">' + esc(n) + '</button>';
+      }).join("") + '</div>';
+  }).join("");
 
+  var parts = selectedParts();
+  var anyType = TYPES.some(function(t) { return state.types[t]; });
+
+  var body = !parts.length
+    ? '<p class="empty">' + (anyType
+        ? "Select at least one type to see its checks."
+        : "Select at least one deployment type to follow the checklist.") + '</p>'
+    : `
     <div class="ticket-area">
       ${ticketBar()}
     </div>
@@ -408,11 +511,19 @@ function renderView() {
 
     ${addForm()}
   `;
+
+  view.innerHTML = `
+    <div class="crumb">${esc(state.site)} / ${esc(parts.map(function(p) { return p.label; }).join(" + ") || "Select deployment")}</div>
+    <h2>${esc(state.site)}</h2>
+    <div class="types">${typesHTML}</div>
+    ${subsHTML}
+    ${body}
+  `;
 }
 
 document.getElementById("selectSiteBtn").addEventListener("click", function() {
   state.site = null;
-  state.type = null;
+  resetSelection();
   renderList();
   renderView();
 });
@@ -424,42 +535,51 @@ document.getElementById("searchSite").addEventListener("input", function() {
 document.addEventListener("click", function(e) {
   var s = e.target.closest("[data-s]");
   var t = e.target.closest("[data-t]");
+  var sb = e.target.closest("[data-sub]");
 
   if (s) {
     state.site = s.dataset.s;
-    state.type = null;
+    resetSelection();
     renderList();
     renderView();
   } else if (t) {
-    state.type = t.dataset.t;
+    var tt = t.dataset.t;
+    if (state.types[tt]) {
+      delete state.types[tt];
+      subsOf(tt).forEach(function(n) { delete state.subs[tt + ":" + n]; });
+    } else {
+      state.types[tt] = 1;
+    }
+    renderView();
+  } else if (sb) {
+    var sid = sb.dataset.sub;
+    if (state.subs[sid]) delete state.subs[sid];
+    else state.subs[sid] = 1;
     renderView();
   } else if (e.target.id === "reset") {
-    var crn = (TICKETS[extraKey(state.site, state.type)] || "").trim();
+    var crn = (TICKETS[extraKey(state.site, comboKey())] || "").trim();
 
     if (!crn) {
       showModal("CRN number is not filled.");
       return;
     }
 
-    var allDone = ["pre", "post"].every(function(p) {
-      return items(state.site, state.type, p).every(function(it) {
-        return !!state.done[it.k];
-      });
+    var rows = [];
+    ["pre", "post"].forEach(function(p) {
+      sections(p).forEach(function(sec) { rows = rows.concat(sec.rows); });
     });
+
+    var allDone = rows.every(function(it) { return !!state.done[it.k]; });
 
     if (!allDone) {
       showModal("All checks are not complete.");
       return;
     }
 
-    ["pre", "post"].forEach(function(p) {
-      items(state.site, state.type, p).forEach(function(it) {
-        delete state.done[it.k];
-      });
-    });
+    rows.forEach(function(it) { delete state.done[it.k]; });
 
     save();
-    delete TICKETS[extraKey(state.site, state.type)];
+    delete TICKETS[extraKey(state.site, comboKey())];
     saveTickets();
     renderList();
     renderView();
@@ -469,9 +589,14 @@ document.addEventListener("click", function(e) {
     var txt = document.getElementById("atext").value.trim();
     if (!txt) return;
 
+    var parts = selectedParts();
+    if (!parts.length) return;
+
     var phase = document.getElementById("aphase").value;
     var ref = document.getElementById("aref").value.trim();
-    var ek = extraKey(state.site, state.type);
+    var partSel = document.getElementById("apart");
+    var partId = partSel ? partSel.value : parts[0].id;
+    var ek = extraKey(state.site, partId);
 
     EXTRA[ek] = EXTRA[ek] || [];
     EXTRA[ek].push({
@@ -485,7 +610,7 @@ document.addEventListener("click", function(e) {
     renderList();
     renderView();
   } else if (e.target.dataset && e.target.dataset.rm) {
-    var ek2 = extraKey(state.site, state.type);
+    var ek2 = extraKey(state.site, e.target.dataset.part);
     var rmid = e.target.dataset.rm;
 
     EXTRA[ek2] = (EXTRA[ek2] || []).filter(function(x) {
@@ -513,7 +638,7 @@ document.addEventListener("change", function(e) {
 
 document.addEventListener("input", function(e) {
   if (e.target.id === "ticketnum") {
-    TICKETS[extraKey(state.site, state.type)] = e.target.value;
+    TICKETS[extraKey(state.site, comboKey())] = e.target.value;
     saveTickets();
     renderList();
   }
