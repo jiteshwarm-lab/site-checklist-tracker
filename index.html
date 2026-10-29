@@ -5,25 +5,28 @@
   <meta charset="utf-8">
   <title>Deployment Checklist Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script>(function(){var t=null;try{t=localStorage.getItem("siteTheme")}catch(e){}if(t!=="light"&&t!=="dark"){t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}document.documentElement.setAttribute("data-theme",t)})();</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Deployment Checklist Tracker</h1>
-    <p>GreyOrange CM Deployment Checklist Tracker</p>
-    <button type="button" id="selectSiteBtn" class="select-site-btn" hidden>
-      Back
-    </button>
+  <header class="top">
+    <div class="brand"><span class="brand-name">GreyOrange</span></div>
+    <div class="top-right">
+      <span class="top-title">Deployment Checklist Tracker</span>
+      <button type="button" id="selectSiteBtn" class="select-site-btn" hidden>← All sites</button>
+      <button type="button" id="themeBtn" class="theme-btn"><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </div>
   </header>
   <main>
     <section class="site-section">
+      <h1 class="page-title">Site Deployment Checks</h1>
+      <p class="page-sub">Pick a site to start its pre and post-deployment checks.</p>
       <div class="site-search">
-  <input
-    type="text"
-    id="searchSite"
-    placeholder="Search site name"
-    autocomplete="off"
-    ></div>
+        <input type="text" id="searchSite" aria-label="Search site name" placeholder="Search site name" autocomplete="off">
+      </div>
       <div id="list" class="site-grid"></div>
     </section>
     <section id="view"></section>
@@ -185,6 +188,7 @@ var CHECKS = {
   }
 };
 
+/* Sub-types */
 var SUBTYPES = {
   JSON: {
     Map: {
@@ -248,6 +252,16 @@ function updateScreenVisibility() {
   if (selectSiteBtn) {
     selectSiteBtn.hidden = !hasSelectedSite;
   }
+
+  var topTitle = document.querySelector(".top-title");
+  if (topTitle) topTitle.hidden = hasSelectedSite;
+}
+
+var SITE_COLORS = ["#ffb36b", "#7dd3c0", "#b7a6ff", "#ff9fb2", "#8cc8ff", "#ffd666", "#b6e388"];
+
+function initials(name) {
+  var w = String(name).replace(/'/g, "").split(/[^A-Za-z0-9]+/).filter(Boolean);
+  return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] || "").slice(0, 2)).toUpperCase();
 }
 
 function renderList() {
@@ -262,9 +276,8 @@ function renderList() {
     })
     .map(function(s) {
       return `
-        <button type="button"
-          class="site ${s === state.site ? "on" : ""}"
-          data-s="${esc(s)}">
+        <button type="button" class="site" data-s="${esc(s)}">
+          <span class="ini" style="background:${SITE_COLORS[SITES.indexOf(s) % SITE_COLORS.length]}">${esc(initials(s))}</span>
           <span class="site-name">${esc(s)}</span>
         </button>
       `;
@@ -355,7 +368,7 @@ function baseTexts(part, p) {
 }
 
 /* Combined list for one phase. Checks with the same wording across parts are merged
-   into "Common checks"; everything else sits under its own part. */
+   into "Common checks" */
 function sections(p) {
   var parts = selectedParts();
   var groups = {}, order = [];
@@ -430,8 +443,7 @@ function block(p, title, sub) {
   var suffix = parts.length === 1 && parts[0].sub ? " (" + esc(parts[0].sub) + ")" : "";
 
   return '<div class="card ' + p + '">' +
-    '<h3>' + title + suffix + '</h3>' +
-    '<div class="pct">' + sub + ' \u00b7 ' + d + ' of ' + total + ' done</div>' +
+    '<div class="cardhead"><h3>' + title + suffix + '</h3><span class="cardstat">' + d + ' / ' + total + '</span></div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
     h + '</div>';
 }
@@ -493,8 +505,8 @@ function renderView() {
 
   var body = !parts.length
     ? '<p class="empty">' + (anyType
-        ? "Select at least one type to see its checks."
-        : "Select at least one deployment type to follow the checklist.") + '</p>'
+        ? "<strong>Select at least one JSON type to see its checks.</strong>"
+        : "Select at least one deployment type.") + '</p>'
     : `
     <div class="ticket-area">
       ${ticketBar()}
@@ -514,7 +526,7 @@ function renderView() {
 
   view.innerHTML = `
     <div class="crumb">${esc(state.site)} / ${esc(parts.map(function(p) { return p.label; }).join(" + ") || "Select deployment")}</div>
-    <h2>${esc(state.site)}</h2>
+    <h1 class="site-title">${esc(state.site)}</h1>
     <div class="types">${typesHTML}</div>
     ${subsHTML}
     ${body}
@@ -644,6 +656,21 @@ document.addEventListener("input", function(e) {
   }
 });
 
+function updateThemeBtn() {
+  var light = document.documentElement.getAttribute("data-theme") === "light";
+  var btn = document.getElementById("themeBtn");
+  btn.setAttribute("aria-label", light ? "Switch to dark mode" : "Switch to light mode");
+  btn.title = light ? "Switch to dark mode" : "Switch to light mode";
+}
+
+document.getElementById("themeBtn").addEventListener("click", function() {
+  var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", next);
+  try { localStorage.setItem("siteTheme", next); } catch (e) {}
+  updateThemeBtn();
+});
+
+updateThemeBtn();
 renderList();
 renderView();
 </script>
